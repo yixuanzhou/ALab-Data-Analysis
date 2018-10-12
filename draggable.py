@@ -2,108 +2,114 @@ import sys
 import matplotlib
 matplotlib.use("Qt5Agg")
 from PyQt5 import QtWidgets, QtGui
-from PyQt5.QtWidgets import QWidget,QSizePolicy,QVBoxLayout,QHBoxLayout,QPushButton,QDialog,QFileDialog,QToolBar,QMessageBox, QLineEdit, QToolButton
+from PyQt5.QtWidgets import QSizePolicy
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
+import matplotlib.pyplot as plt
 import numpy as np
-from drag import DraggablePoint
+from scipy import stats
+import csv
 
 class PlotCanvas(FigureCanvas):
 
-    def __init__(self, parent=None, width=10, height=8, dpi=100):
+    def __init__(self, parent=None, width=2, height=4, dpi=100):
         self.fig = Figure(figsize=(width, height), dpi=dpi)
-        self.axes = self.fig.add_subplot(111)
+        self.axes = self.fig.add_subplot(111, position=[0.2, 0.15, 0.65, 0.75])
 
         FigureCanvas.__init__(self, self.fig)
         self.parent = parent
+        #FigureCanvas.setSizePolicy(self, QSizePolicy.Expanding, QSizePolicy.Expanding)
+        #FigureCanvas.updateGeometry(self)
+        self.annot = None
 
-        FigureCanvas.setSizePolicy(self, QSizePolicy.Expanding, QSizePolicy.Expanding)
-        FigureCanvas.updateGeometry(self)
-        self.lines = []
-        self.list_points = []
-        self.point_pairs = []
-        self.number_of_lines = 0
-        self.plot_line = False
         self.Qs = None
         self.couplings = None
-        self.intercept = 0
+        self.lambdas = None
         self.selected = []
-        # self.plot()
-        # self.create_draggable_points()
+        self.x = None
+        self.Y = None
+        self.coll = None
+        self.mode = 1
 
-    def setParameter(self, Qs, couplings):
+    def setParameter(self, Qs, couplings, lambdas):
         self.Qs = Qs
         self.couplings = couplings
+        self.lambdas = lambdas
 
 
-    def plot(self):
-        #import numpy as np
-        # axes = self.figure.add_subplot(111)
-        x = np.asarray(self.couplings[:-1], dtype='float')
-        Y = np.asarray(self.Qs[:-1], dtype='float')
-        # #A = np.vstack([x, np.ones(len(x))]).T
-        # #m, c = np.linalg.lstsq(A, Y, rcond=None)[0]
-        # #axes.plot(x, Y, 'o', color = 'b', label='Original data', markersize=6)
-        # #axes.plot(x, m*x + c, 'r', label='Fitted line')
-        # axes.scatter(x, Y, color="blue", picker = 5, s=[50]*len(x))
-        # axes.legend()
-        # axes.set_title('Q')
-        # self.draw()
-        #print(x.min(), m*x.min()+c, x.max(), m*x.max()+c)
-        #self.create_draggable_points(x.min(), m*x.min()+c, x.max(), m*x.max()+c, 0.1, 1000000)
-        #testData = np.array([[0,0], [0.1, 0], [0, 0.3], [-0.4, 0], [0, -0.5]])
-        ax = self.figure.add_subplot(111)
-        ax.set_title('Calculate Q',fontsize=20)
-        ax.set_xlabel('coupling %',fontsize=16)
-        ax.set_ylabel('Q intrinsic',fontsize=16)
-        coll = ax.scatter(x, Y, color=["blue"]*len(x), picker = 5, s=[50]*len(x))
-        
+    def plot(self, mode):
+        self.mode = mode
+        self.x = np.asarray(self.couplings[:], dtype='float')
+        self.Y = np.asarray(self.Qs[:], dtype='float')
+        self.annot = self.axes.annotate("", xy=(0,0), xytext=(20,20), textcoords="offset points",
+                                        va="top", ha="center",
+                                        bbox=dict(boxstyle="round", fc="w"))
+        self.annot.set_visible(False)
+        self.axes.set_xlabel('coupling %',fontsize=12)
+        self.axes.set_ylabel('Q intrinsic',fontsize=12)
+        if (mode == 1):
+            self.coll = self.axes.scatter(self.x, self.Y, color=["blue"]*len(self.x), marker='s', facecolor=[(0, 0, 0, 0)]*len(self.x), picker = 5, s=[50]*len(self.x))
+        else:
+            self.coll = self.axes.scatter(self.x, self.Y, color=["blue", "red"]*len(self.x), marker='s', facecolor=[(0, 0, 0, 0)]*len(self.x), picker = 5, s=[50]*len(self.x))
+        self.figure.canvas.mpl_connect('pick_event', self.on_pick)
+        self.figure.canvas.mpl_connect('motion_notify_event', self.on_hover)
+        # print(self.x)
+        # print(self.Y)
 
-        def on_pick(event):
-            print(x[event.ind], Y[event.ind], "clicked")
-            if [x[event.ind][0], Y[event.ind][0]] not in self.selected:                
-                coll._facecolors[event.ind,:] = (1, 0, 0, 1)
-                coll._edgecolors[event.ind,:] = (1, 0, 0, 1)
-                self.selected.append([x[event.ind][0], Y[event.ind][0]])
+    def on_pick(self, event):
+        if [self.x[event.ind][0], self.Y[event.ind][0]] not in self.selected:
+            if self.mode == 1:
+                self.coll._facecolors[event.ind,:] = (0, 0, 1, 1)
             else:
-                coll._facecolors[event.ind,:] = (0, 0, 1, 1)
-                coll._edgecolors[event.ind,:] = (0, 0, 1, 1)
-                self.selected.remove([x[event.ind][0], Y[event.ind][0]])
-            self.figure.canvas.draw()
-            print(self.selected)
-        self.figure.canvas.mpl_connect('pick_event', on_pick)
+                if event.ind % 2 == 0:
+                    self.coll._facecolors[event.ind,:] = (0, 0, 1, 1)
+                else:
+                    self.coll._facecolors[event.ind,:] = (1, 0, 0, 1)
+            #self.coll._edgecolors[event.ind,:] = (1, 0, 0, 1)
+            self.selected.append([self.x[event.ind][0], self.Y[event.ind][0]])
+        else:
+            self.coll._facecolors[event.ind,:] = (0, 0, 0, 0)
+            #self.coll._edgecolors[event.ind,:] = (0, 0, 1, 1)
+            self.selected.remove([self.x[event.ind][0], self.Y[event.ind][0]])
+        self.figure.canvas.draw()
+        #print(self.selected)
+        #self.figure.canvas.mpl_connect('pick_event', on_pick)      
 
+    def update_annot(self, ind):
+        pos = self.coll.get_offsets()[ind["ind"][0]]
+        self.annot.xy = pos
+        text = "{}, {}, {}".format(" ".join([str('%s' % float('%.8g' % self.lambdas[n])) for n in ind["ind"]]),
+                               " ".join([str('%s' % float('%.4g' % self.x[n])) for n in ind["ind"]]), 
+                               " ".join([str('{:.3e}'.format(self.Y[n])) for n in ind["ind"]]))
+        self.annot.set_text(text)
 
-    def create_draggable_points(self, x1, y1, x2, y2, xc, yc):
-        self.list_points.append(DraggablePoint(self, True, x1, y1, 1, xc, yc))
-        self.list_points.append(DraggablePoint(self, False, x2, y2, 1, xc, yc))
-        # TODO Koordinaten an den Plot anpassen (+500)
-        i = self.list_points[0]
-        j = self.list_points[1]
-        i.partner = j
-        j.partner = i
-        i.setLine(Line2D([i.x, j.x], [i.y, j.y], color='b', alpha=0.5))
-        j.setLine(Line2D([i.x, j.x], [i.y, j.y], color='b', alpha=0.5))
-        self.lines.append(i.line)
-        self.lines.append(j.line)
-        print(self.lines)
-
-        self.point_pairs.append((i, j))
-        
-        self.updateFigure()
-        i.drawline()
-        j.drawline()
+    def on_hover(self, event):
+        vis = self.annot.get_visible()
+        if event.inaxes == self.axes:
+            cont, ind = self.coll.contains(event)
+            if cont:
+                self.update_annot(ind)
+                self.annot.set_visible(True)
+                self.figure.canvas.draw_idle()
+            else:
+                if vis:
+                    self.annot.set_visible(False)
+                    self.figure.canvas.draw_idle()
 
     def updateFigure(self):
         self.draw()
 
-    def setIntercept(self, x1, y1, x2, y2):
-        self.intercept = y1 - x1*(y2-y1)/(x2-x1)
+    def updateQ(self, intercept):
+        self.parent.updateQ(intercept, std_err)
 
-    def updateQ(self):
-        self.parent.updateQ(self.intercept)
+    def export(self):
+        print(self.Qs)
+        with open("./result", "w") as output:
+            writer = csv.writer(output, lineterminator='\n')
+            writer.writerows(self.Qs)
 
     def Rsquared(self):
         if (self.selected == []):
@@ -112,10 +118,11 @@ class PlotCanvas(FigureCanvas):
             x = np.asarray([p[0] for p in self.selected], dtype='float')
             Y = np.asarray([p[1] for p in self.selected], dtype='float')
             A = np.vstack([x, np.ones(len(x))]).T
-            m, c = np.linalg.lstsq(A, Y, rcond=None)[0]
+            slope, intercept, r_value, p_value, std_err = stats.linregress(x, Y)
             #axes.plot(x, Y, 'o', color = 'b', label='Original data', markersize=6)
-            self.axes.plot(x, m*x + c, 'g', label='Fitted line')
+            self.axes.plot(x, slope*x + intercept, 'g', label='Fitted line')
             self.updateFigure()
+            self.parent.updateQ(intercept, std_err)
             print(self.axes.lines)
 
     def unfit(self):
@@ -124,3 +131,14 @@ class PlotCanvas(FigureCanvas):
         else:
             self.axes.lines.pop()
             self.updateFigure()
+
+    def reset(self):
+        self.fig.clear()
+        self.axes = self.fig.add_subplot(111, position=[0.2, 0.15, 0.65, 0.75])
+        self.figure.canvas.mpl_disconnect(self.on_pick)
+        self.figure.canvas.mpl_disconnect(self.on_hover)
+        self.Qs = None
+        self.couplings = None
+        self.intercept = 0
+        self.selected.clear()
+        self.updateFigure()

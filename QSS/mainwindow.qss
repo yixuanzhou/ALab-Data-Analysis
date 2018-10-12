@@ -2,7 +2,12 @@ QFrame#Main {
   background-color: #FFFFFF;
 }
 
-QLabel#InImg, #GenTex, #GenEqu {
+QLabel#OutputImg {
+   background: transparent;
+   font-size: 25px
+}
+
+/*QLabel#InImg, #GenTex, #GenEqu {
    background: transparent;
    color: #233140;
    font-family: 'Montserrat', sans-serif;
@@ -10,11 +15,7 @@ QLabel#InImg, #GenTex, #GenEqu {
    font-weight: 700;
 }
 
-QLabel#InputImg, #OutputImg {
-   background: transparent;
-   border: 2px solid #233140;
-   border-radius: 5px;   
-}
+
 
 QLabel#S1, #S2, #S3 {   
 }
@@ -25,18 +26,21 @@ QLabel#Dir {
 }
 
 QPushButton {
-   font-family: 'Lato';
-   font-size: 15px;
-   background: transparent;
-   color: #233140;
+/*   font-family: 'Lato';
+   font-size: 15px;*/
+/*   background: transparent;*/
+/*   color: #233140;
    border-style: outset;
-   border-color: #233140;
+   
+   
+   
+   height: 50px;
+   width: 50px;
    border-width: 1px;
+   border-color: #233140;
    border-radius: 5px;
-   height: 30px;
-   width: 100px;
-}
-
+}*/
+/*
 QPushButton#resetButton {  
   border-width: 0px;
 }
@@ -56,4 +60,4 @@ QPushButton:hover, QPushButton:pressed, QPushButton:checked {
 QTextBrowser {
   border: 2px solid #233140;
   border-radius: 5px;
-}
+}*/*/
